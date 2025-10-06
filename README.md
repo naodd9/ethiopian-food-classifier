@@ -53,7 +53,7 @@ The model can recognize these 11 traditional Ethiopian foods:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/ethiopian-food-classifier.git
+git clone https://github.com/naodd9/ethiopian-food-classifier.git
 cd ethiopian-food-classifier
 
 # Install dependencies
