@@ -5,13 +5,13 @@ import torch.nn as nn
 from torchvision import models, transforms
 from PIL import Image
 import os
-import requests
+import gdown
 
 # === CONFIG - GOOGLE DRIVE ===
-# REPLACE THIS WITH YOUR ACTUAL GOOGLE DRIVE FILE ID
 FILE_ID = "1z1D_CX9HBT5HVcQvf0bvaETXtr5jd4pF"  # ← REPLACE WITH YOUR FILE ID
 MODEL_URL = f"https://drive.google.com/uc?id=1z1D_CX9HBT5HVcQvf0bvaETXtr5jd4pF&export=download"
 MODEL_PATH = "ethiopian_food_classifier_11_classes.pt"
+
 
 class EthiopianFoodClassifier(nn.Module):
     def __init__(self, num_classes=11):
@@ -35,37 +35,47 @@ def download_and_load_model():
     # Download model if not exists
     if not os.path.exists(MODEL_PATH):
         try:
-            with st.spinner('📥 Downloading model from Google Drive (first time only, ~30 seconds)...'):
-                session = requests.Session()
-                response = session.get(MODEL_URL, stream=True)
-                
-                # Save the file
-                with open(MODEL_PATH, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=32768):
-                        if chunk:
-                            f.write(chunk)
-                
+            with st.spinner('📥 Downloading model from Google Drive (first time only)...'):
+                # Use gdown which handles Google Drive virus scan pages
+                gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
                 st.success("✅ Model downloaded successfully!")
                 
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
+            st.info("""
+            **Manual Download Option:**
+            If automatic download fails, please:
+            1. Download the model manually from: https://drive.google.com/file/d/12TMelvEjhi2fb9T64EayBQ/view
+            2. Upload it directly to your Streamlit app files
+            """)
             return None
     
-    # Load model with PyTorch 2.6 fix
+    # Load model
     try:
+        # Check if file is valid
+        file_size = os.path.getsize(MODEL_PATH)
+        if file_size < 1000000:  # If file is too small, it's probably an HTML error page
+            st.error("❌ Downloaded file is too small - might be an error page")
+            os.remove(MODEL_PATH)  # Delete the bad file
+            return None
+            
         model = EthiopianFoodClassifier(num_classes=11)
         model.load_state_dict(torch.load(MODEL_PATH, map_location='cpu', weights_only=False))
         model.eval()
+        st.success("✅ Model loaded successfully!")
         return model
     except Exception as e:
         st.error(f"❌ Error loading model: {e}")
+        # Try to remove corrupted file
+        if os.path.exists(MODEL_PATH):
+            os.remove(MODEL_PATH)
         return None
 
 # Class names for Ethiopian food
 class_names = ['Beyaynetu', 'Chechebsa', 'Doro Wat', 'Firfir', 'Genfo',
                'Kikil', 'Kitfo', 'Shekla Tibs', 'Shiro Wat', 'Tihlo', 'Tire Siga']
 
-# Image preprocessing (same as training)
+# Image preprocessing
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -79,37 +89,27 @@ def main():
         layout="wide"
     )
     
-    # Header
     st.title("🌮 Ethiopian Food Classifier")
-    st.markdown("**Upload a photo of Ethiopian food and I'll tell you what it is!**")
+    st.markdown("Upload a photo of Ethiopian food and I'll tell you what it is!")
     
     # Load model
     model = download_and_load_model()
     
     if model is None:
-        st.error("""
-        **Troubleshooting tips:**
-        - Make sure your Google Drive file is shared publicly
-        - Check that the FILE_ID is correct in the code
-        - The file should be named: `ethiopian_food_classifier_11_classes.pt`
-        """)
-        return
+        st.stop()
     
-    # Create two columns
     col1, col2 = st.columns([1, 1])
     
     with col1:
         st.subheader("📸 Upload Food Photo")
         uploaded_file = st.file_uploader(
-            "Choose an image file", 
-            type=["jpg", "jpeg", "png"],
-            help="Upload a clear photo of Ethiopian food"
+            "Choose an image...", 
+            type=["jpg", "jpeg", "png"]
         )
         
         if uploaded_file is not None:
-            # Display the uploaded image
             image = Image.open(uploaded_file).convert('RGB')
-            st.image(image, caption="Your Food Photo", use_column_width=True)
+            st.image(image, caption="Uploaded Image", use_column_width=True)
     
     with col2:
         st.subheader("🎯 Prediction Results")
@@ -118,21 +118,16 @@ def main():
             if st.button('🧠 Classify Food', type='primary', use_container_width=True):
                 with st.spinner('Analyzing your food...'):
                     try:
-                        # Preprocess the image
                         image_tensor = transform(image).unsqueeze(0)
                         
-                        # Make prediction
                         with torch.no_grad():
                             outputs = model(image_tensor)
                             probabilities = torch.nn.functional.softmax(outputs[0], dim=0)
                         
-                        # Get top 3 predictions
                         top3_probs, top3_indices = torch.topk(probabilities, 3)
                         
-                        # Display results
                         st.success("**🍽️ Prediction Results**")
                         
-                        # Top prediction
                         top_confidence = top3_probs[0].item() * 100
                         top_food = class_names[top3_indices[0].item()]
                         
@@ -140,7 +135,6 @@ def main():
                         st.markdown(f"**Confidence: {top_confidence:.1f}%**")
                         st.progress(int(top_confidence))
                         
-                        # Show other possibilities
                         if len(top3_probs) > 1:
                             st.markdown("**Other possibilities:**")
                             for i in range(1, min(3, len(top3_probs))):
@@ -152,16 +146,12 @@ def main():
                         st.error(f"❌ Error during classification: {str(e)}")
         
         else:
-            st.info("👆 **Upload a food photo to get started!**")
+            st.info("👆 Upload a food photo to get started!")
             
-            # Show supported foods
             st.markdown("---")
             st.subheader("🍴 Supported Ethiopian Foods:")
             for food in class_names:
                 st.write(f"• {food}")
-            
-            st.markdown("---")
-            st.info("💡 **Tip:** Use clear, well-lit photos for best results!")
 
 if __name__ == "__main__":
     main()
