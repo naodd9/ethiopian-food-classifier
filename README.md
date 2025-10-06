@@ -13,8 +13,9 @@ Try the live web app: [**Ethiopian Food Classifier**](https://ethiopian-food-cla
 
 ## 📸 Screenshot
 
-![App Screenshot](https://via.placeholder.com/800x400/4A90E2/FFFFFF?text=Ethiopian+Food+Classifier+Demo)
+![App Screenshot](https://github.com/naodd9/ethiopian-food-classifier/blob/main/Screenshot%202025-10-06%20165358.png?raw=true)
 
+*The app interface showing Ethiopian food classification in action*
 ## 🎯 Features
 
 - **AI-Powered Recognition**: Identifies 11 different Ethiopian dishes
